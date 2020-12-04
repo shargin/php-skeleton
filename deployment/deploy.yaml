@@ -1,0 +1,68 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: test-deployment
+  labels:
+    app: test
+    version: v1
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: test
+      version: v1
+  template:
+    metadata:
+      name: test
+      labels:
+        app: test
+        version: v1
+    spec:
+      restartPolicy: Always
+      containers:
+        - name: test-pod
+          image: {{ image }}
+          imagePullPolicy: Always
+          envFrom:
+            - secretRef:
+                name: test-secret
+          livenessProbe:
+            periodSeconds: 5
+            initialDelaySeconds: 15
+            httpGet:
+              port: 9000
+              path: /test/health
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: test-service
+spec:
+  selector:
+    app: test
+    version: v1
+  ports:
+    - port: 9000
+      targetPort: 9000
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: test-virtual-service
+  labels:
+    app: test
+    version: v1
+spec:
+  gateways:
+    - api-gateway
+  hosts:
+    - "*"
+  http:
+    - match:
+        - uri:
+            prefix: /test
+      route:
+        - destination:
+            host: test-service
+            port:
+              number: 9000
